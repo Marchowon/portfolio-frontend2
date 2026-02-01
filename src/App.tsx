@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Treemap, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, LabelList, BarChart } from 'recharts';
 import { Plus, Minus, RefreshCw, TrendingUp, TrendingDown, DollarSign, Wallet, PieChart as PieChartIcon, Filter, Upload, X, Pencil, ChevronLeft, ChevronRight, RotateCcw, BarChart2, Coins, ArrowUp, ArrowDown, Target, Cloud, CloudOff } from 'lucide-react';
@@ -16,10 +17,13 @@ let appId = 'default-app-id';
 try {
   console.log("🔍 Firebase 초기화 시작...");
 
-  // process.env에서 환경변수 읽기 (Vercel 호환)
-  const configStr = process.env.__firebase_config || (window as any).__firebase_config;
-  const appIdStr = process.env.__app_id || (window as any).__app_id;
+  // Vite import.meta.env에서 환경변수 읽기 (Vercel 호환)
+  const viteEnv = import.meta.env as any;
+  const configStr = viteEnv.__firebase_config || (window as any).__firebase_config;
+  const appIdStr = viteEnv.__app_id || (window as any).__app_id;
 
+  console.log("🔍 configStr:", configStr ? "있음" : "없음");
+  console.log("🔍 appIdStr:", appIdStr ? "있음" : "없음");
   console.log("__firebase_config 존재:", !!configStr);
   console.log("__app_id 존재:", !!appIdStr);
 
@@ -320,7 +324,8 @@ export default function PortfolioDashboard() {
           console.error("🔴 auth가 미초기화됨");
           return;
         }
-        const token = process.env.__initial_auth_token || (window as any).__initial_auth_token;
+        const viteEnv = import.meta.env as any;
+        const token = viteEnv.__initial_auth_token || (window as any).__initial_auth_token;
         if (token) {
           console.log("🔐 Custom Token으로 로그인 시도...");
           await signInWithCustomToken(auth, token);
