@@ -17,10 +17,9 @@ let appId = 'default-app-id';
 try {
   console.log("🔍 Firebase 초기화 시작...");
 
-  // Vite import.meta.env에서 환경변수 읽기 (Vercel 호환)
-  const viteEnv = import.meta.env as any;
-  const configStr = viteEnv.__firebase_config || (window as any).__firebase_config;
-  const appIdStr = viteEnv.__app_id || (window as any).__app_id;
+  // Vite import.meta.env에서 환경변수 읽기 (VITE_ 접두사 필수!)
+  const configStr = import.meta.env.VITE_FIREBASE_CONFIG;
+  const appIdStr = import.meta.env.VITE_APP_ID;
 
   console.log("🔍 configStr:", configStr ? "있음" : "없음");
   console.log("🔍 appIdStr:", appIdStr ? "있음" : "없음");
@@ -324,8 +323,7 @@ export default function PortfolioDashboard() {
           console.error("🔴 auth가 미초기화됨");
           return;
         }
-        const viteEnv = import.meta.env as any;
-        const token = viteEnv.__initial_auth_token || (window as any).__initial_auth_token;
+        const token = import.meta.env.VITE_INITIAL_AUTH_TOKEN;
         if (token) {
           console.log("🔐 Custom Token으로 로그인 시도...");
           await signInWithCustomToken(auth, token);
