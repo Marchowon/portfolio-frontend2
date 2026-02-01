@@ -21,15 +21,26 @@ let db: any;
 let appId = 'default-app-id';
 
 try {
+  console.log("🔍 Firebase 초기화 시작...");
+  console.log("__firebase_config 존재:", typeof globalThis.__firebase_config !== 'undefined');
+  console.log("__app_id 존재:", typeof globalThis.__app_id !== 'undefined');
+
   if (typeof globalThis.__firebase_config !== 'undefined' && globalThis.__firebase_config) {
     firebaseConfig = JSON.parse(globalThis.__firebase_config);
+    console.log("✅ Firebase Config 파싱 성공:", firebaseConfig.projectId);
     app = initializeApp(firebaseConfig);
+    console.log("✅ Firebase App 초기화 완료");
     auth = getAuth(app);
+    console.log("✅ Firebase Auth 초기화 완료");
     db = getFirestore(app);
+    console.log("✅ Firebase Firestore 초기화 완료");
+  } else {
+    console.warn("⚠️ Firebase Config가 없습니다. 환경변수를 확인하세요.");
   }
   appId = typeof globalThis.__app_id !== 'undefined' && globalThis.__app_id ? globalThis.__app_id : 'default-app-id';
+  console.log("📦 App ID:", appId);
 } catch (e) {
-  console.error("Firebase Config Error:", e);
+  console.error("🔴 Firebase Config Error:", e);
 }
 
 // --- 초기 데이터 (빈 값으로 시작) ---
@@ -306,18 +317,29 @@ export default function PortfolioDashboard() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (!auth) return;
+        console.log("🔐 Firebase Auth 초기화 시작...");
+        if (!auth) {
+          console.error("🔴 auth가 미초기화됨");
+          return;
+        }
         if (typeof globalThis.__initial_auth_token !== 'undefined' && globalThis.__initial_auth_token) {
+          console.log("🔐 Custom Token으로 로그인 시도...");
           await signInWithCustomToken(auth, globalThis.__initial_auth_token);
+          console.log("✅ Custom Token 로그인 성공");
         } else {
+          console.log("🔐 Anonymous로 로그인 시도...");
           await signInAnonymously(auth);
+          console.log("✅ Anonymous 로그인 성공");
         }
       } catch (error) {
-        console.error("Auth Failed:", error);
+        console.error("🔴 Auth Failed:", error);
       }
     };
     initAuth();
-    const unsubscribe = auth ? onAuthStateChanged(auth, setUser) : () => {};
+    const unsubscribe = auth ? onAuthStateChanged(auth, (user) => {
+      console.log("👤 Auth 상태 변경:", user ? `로그인됨 (${user.uid})` : "로그아웃");
+      setUser(user);
+    }) : () => {};
     return () => unsubscribe();
   }, []);
 
@@ -361,20 +383,26 @@ export default function PortfolioDashboard() {
 
   // --- 3. Firebase Helper Function (Write) ---
   const savePortfolioToFirebase = async (newPortfolio: any[]) => {
+    console.log("📥 savePortfolioToFirebase 호출됨");
+    console.log("user 상태:", user ? `로그인됨 (${user.uid})` : "미로그인");
+    console.log("db 상태:", db ? "초기화됨" : "미초기화");
+
     if (!user || !db) {
+      console.error("🔴 저장 실패: user=" + !!user + ", db=" + !!db);
       alert("로그인이 필요합니다. (자동 로그인 중...)");
       return;
     }
 
     try {
-      console.log("Saving portfolio to Firebase...", newPortfolio.length, "items");
+      console.log("✅ Firebase에 저장 시작...", newPortfolio.length, "items");
+      console.log("저장 경로: artifacts/" + appId + "/users/" + user.uid + "/portfolio");
       const batchPromises = newPortfolio.map(item =>
         setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'portfolio', String(item.id)), item)
       );
       await Promise.all(batchPromises);
-      console.log("Portfolio saved successfully!");
+      console.log("✅ Portfolio saved successfully!");
     } catch (error) {
-      console.error("Error saving portfolio:", error);
+      console.error("🔴 Error saving portfolio:", error);
       alert("데이터 저장 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
     }
   };
