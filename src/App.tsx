@@ -1,34 +1,39 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { Treemap, PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Area, LabelList, BarChart } from 'recharts';
-import { Plus, Minus, RefreshCw, TrendingUp, TrendingDown, DollarSign, Wallet, PieChart as PieChartIcon, Filter, Upload, CheckCircle, XCircle, X, Pencil, ChevronLeft, ChevronRight, RotateCcw, Calendar, BarChart2, Coins, ArrowUp, ArrowDown, Target, Save, Cloud, CloudOff } from 'lucide-react';
+import { Treemap, ResponsiveContainer, Tooltip as RechartsTooltip, Legend, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, LabelList, BarChart } from 'recharts';
+import { Plus, Minus, RefreshCw, TrendingUp, TrendingDown, DollarSign, Wallet, PieChart as PieChartIcon, Filter, Upload, X, Pencil, ChevronLeft, ChevronRight, RotateCcw, BarChart2, Coins, ArrowUp, ArrowDown, Target, Cloud, CloudOff } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, User } from "firebase/auth";
-import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, collection, doc, setDoc, onSnapshot } from "firebase/firestore";
+
+// --- 환경 변수 선언 (Vercel에서 주입) ---
+declare global {
+  var __firebase_config: string | undefined;
+  var __app_id: string | undefined;
+  var __initial_auth_token: string | undefined;
+}
 
 // --- Firebase 초기화 ---
 // __firebase_config가 없는 환경(로컬 등)일 경우를 대비해 예외처리
-let firebaseConfig;
-try {
-  firebaseConfig = JSON.parse(__firebase_config);
-} catch (e) {
-  console.error("Firebase Config Error: __firebase_config가 정의되지 않았거나 올바르지 않습니다. 로컬 환경이라면 직접 config 객체를 입력해주세요.");
-  // 로컬 테스트용 더미 객체 (실제 작동 안 함)
-  firebaseConfig = {}; 
-}
+let firebaseConfig: any = {};
+let app: any;
+let auth: any;
+let db: any;
+let appId = 'default-app-id';
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+try {
+  if (typeof globalThis.__firebase_config !== 'undefined' && globalThis.__firebase_config) {
+    firebaseConfig = JSON.parse(globalThis.__firebase_config);
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+  }
+  appId = typeof globalThis.__app_id !== 'undefined' && globalThis.__app_id ? globalThis.__app_id : 'default-app-id';
+} catch (e) {
+  console.error("Firebase Config Error:", e);
+}
 
 // --- 초기 데이터 (빈 값으로 시작) ---
 const INITIAL_DATA: any[] = [];
-
-// --- 거래 내역 초기 데이터 (빈 값) ---
-const generateInitialTransactions = () => [];
-
-// --- 과거 수익률 데이터 (빈 값) ---
-const generateMockHistory = () => [];
 
 // --- 코인 ID 매핑 (CoinGecko API용) ---
 const COIN_ID_MAP: { [key: string]: string } = {
@@ -64,9 +69,6 @@ const TICKER_DB: { [key: string]: { name: string; assetClass: string; risk: stri
   'SOL': { name: '솔라나', assetClass: '암호화폐', risk: '초고위험' },
   'DOGE': { name: '도지코인', assetClass: '암호화폐', risk: '초고위험' },
 };
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
-const RISK_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e'];
 
 // 위험도 정렬 순서 정의
 const RISK_ORDER: { [key: string]: number } = {
@@ -304,8 +306,9 @@ export default function PortfolioDashboard() {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
+        if (!auth) return;
+        if (typeof globalThis.__initial_auth_token !== 'undefined' && globalThis.__initial_auth_token) {
+          await signInWithCustomToken(auth, globalThis.__initial_auth_token);
         } else {
           await signInAnonymously(auth);
         }
@@ -314,32 +317,32 @@ export default function PortfolioDashboard() {
       }
     };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, setUser);
+    const unsubscribe = auth ? onAuthStateChanged(auth, setUser) : () => {};
     return () => unsubscribe();
   }, []);
 
   // --- 2. Firebase Data Sync (Read) ---
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
 
     // 포트폴리오 데이터 구독
     const unsubPortfolio = onSnapshot(
       collection(db, 'artifacts', appId, 'users', user.uid, 'portfolio'),
-      (snapshot) => {
+      (snapshot: any) => {
         const items: any[] = [];
-        snapshot.forEach((doc) => items.push(doc.data()));
+        snapshot.forEach((docItem: any) => items.push(docItem.data()));
         if (items.length > 0) setPortfolio(items);
         else if (!snapshot.metadata.hasPendingWrites) setPortfolio([]); // 서버 데이터가 없으면 빈 배열
       },
-      (error) => console.error("Portfolio sync error:", error)
+      (error: any) => console.error("Portfolio sync error:", error)
     );
 
     // 기타 설정 데이터 구독
     const unsubSettings = onSnapshot(
       doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config'),
-      (doc) => {
-        if (doc.exists()) {
-          const data = doc.data();
+      (docItem: any) => {
+        if (docItem.exists()) {
+          const data = docItem.data();
           if (data.targetAsset) setTargetAsset(data.targetAsset);
           if (data.targetAssetRatios) setTargetAssetRatios(data.targetAssetRatios);
           if (data.targetRiskRatios) setTargetRiskRatios(data.targetRiskRatios);
@@ -347,7 +350,7 @@ export default function PortfolioDashboard() {
           if (data.performanceHistory) setPerformanceHistory(data.performanceHistory);
         }
       },
-      (error) => console.error("Settings sync error:", error)
+      (error: any) => console.error("Settings sync error:", error)
     );
 
     return () => {
@@ -358,14 +361,14 @@ export default function PortfolioDashboard() {
 
   // --- 3. Firebase Helper Function (Write) ---
   const savePortfolioToFirebase = async (newPortfolio: any[]) => {
-    if (!user) {
+    if (!user || !db) {
       alert("로그인이 필요합니다. (자동 로그인 중...)");
       return;
     }
-    
+
     try {
       console.log("Saving portfolio to Firebase...", newPortfolio.length, "items");
-      const batchPromises = newPortfolio.map(item => 
+      const batchPromises = newPortfolio.map(item =>
         setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'portfolio', String(item.id)), item)
       );
       await Promise.all(batchPromises);
@@ -377,7 +380,7 @@ export default function PortfolioDashboard() {
   };
 
   const saveSettingsToFirebase = async (data: any) => {
-    if (!user) return;
+    if (!user || !db) return;
     try {
       console.log("Saving settings to Firebase...");
       await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'config'), data, { merge: true });
@@ -1430,12 +1433,12 @@ export default function PortfolioDashboard() {
                     </td>
                     
                     {/* Editable Quantity */}
-                    <td 
+                    <td
                         className="px-2 py-4 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors hidden sm:table-cell"
                         onClick={() => handleStartEdit(item, 'qty')}
                         title="클릭하여 수량 수정"
                     >
-                       {editingCell?.id === item.id && editingCell.field === 'qty' ? (
+                       {editingCell && editingCell.id === item.id && editingCell.field === 'qty' ? (
                           <input 
                             ref={editInputRef}
                             type="number" 
@@ -1454,12 +1457,12 @@ export default function PortfolioDashboard() {
                     </td>
 
                     {/* New Editable Unit Price (매수 단가) */}
-                    <td 
+                    <td
                         className="px-2 py-4 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors hidden lg:table-cell"
                         onClick={() => handleStartEdit(item, 'avgPrice')}
                         title="클릭하여 매수 단가 수정"
                     >
-                      {editingCell?.id === item.id && editingCell.field === 'avgPrice' ? (
+                      {editingCell && editingCell.id === item.id && editingCell.field === 'avgPrice' ? (
                           <input 
                             ref={editInputRef}
                             type="number" 
