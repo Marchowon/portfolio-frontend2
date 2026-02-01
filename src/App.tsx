@@ -5,15 +5,8 @@ import { initializeApp } from "firebase/app";
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, User } from "firebase/auth";
 import { getFirestore, collection, doc, setDoc, onSnapshot } from "firebase/firestore";
 
-// --- 환경 변수 선언 (Vercel에서 주입) ---
-declare global {
-  var __firebase_config: string | undefined;
-  var __app_id: string | undefined;
-  var __initial_auth_token: string | undefined;
-}
-
 // --- Firebase 초기화 ---
-// __firebase_config가 없는 환경(로컬 등)일 경우를 대비해 예외처리
+// Vercel 환경변수 또는 로컬 환경변수 사용
 let firebaseConfig: any = {};
 let app: any;
 let auth: any;
@@ -22,11 +15,16 @@ let appId = 'default-app-id';
 
 try {
   console.log("🔍 Firebase 초기화 시작...");
-  console.log("__firebase_config 존재:", typeof globalThis.__firebase_config !== 'undefined');
-  console.log("__app_id 존재:", typeof globalThis.__app_id !== 'undefined');
 
-  if (typeof globalThis.__firebase_config !== 'undefined' && globalThis.__firebase_config) {
-    firebaseConfig = JSON.parse(globalThis.__firebase_config);
+  // process.env에서 환경변수 읽기 (Vercel 호환)
+  const configStr = process.env.__firebase_config || (window as any).__firebase_config;
+  const appIdStr = process.env.__app_id || (window as any).__app_id;
+
+  console.log("__firebase_config 존재:", !!configStr);
+  console.log("__app_id 존재:", !!appIdStr);
+
+  if (configStr) {
+    firebaseConfig = JSON.parse(configStr);
     console.log("✅ Firebase Config 파싱 성공:", firebaseConfig.projectId);
     app = initializeApp(firebaseConfig);
     console.log("✅ Firebase App 초기화 완료");
@@ -37,7 +35,7 @@ try {
   } else {
     console.warn("⚠️ Firebase Config가 없습니다. 환경변수를 확인하세요.");
   }
-  appId = typeof globalThis.__app_id !== 'undefined' && globalThis.__app_id ? globalThis.__app_id : 'default-app-id';
+  appId = appIdStr || 'default-app-id';
   console.log("📦 App ID:", appId);
 } catch (e) {
   console.error("🔴 Firebase Config Error:", e);
@@ -322,9 +320,10 @@ export default function PortfolioDashboard() {
           console.error("🔴 auth가 미초기화됨");
           return;
         }
-        if (typeof globalThis.__initial_auth_token !== 'undefined' && globalThis.__initial_auth_token) {
+        const token = process.env.__initial_auth_token || (window as any).__initial_auth_token;
+        if (token) {
           console.log("🔐 Custom Token으로 로그인 시도...");
-          await signInWithCustomToken(auth, globalThis.__initial_auth_token);
+          await signInWithCustomToken(auth, token);
           console.log("✅ Custom Token 로그인 성공");
         } else {
           console.log("🔐 Anonymous로 로그인 시도...");
